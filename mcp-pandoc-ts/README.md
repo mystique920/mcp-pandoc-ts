@@ -70,14 +70,15 @@ graph TD
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Run the Flask service:**
-    *   Open a **new, separate terminal window** on your host machine (do not reuse the terminal where you might run LibreChat or Docker commands).
+4.  **Run the Host Service using Waitress:**
+    *   Open a **new, separate terminal window** on your host machine.
     *   Ensure you are still inside the `pandoc-host-service` directory and that your virtual environment (if created) is active.
-    *   Execute the following command:
+    *   Make the run script executable (if you haven't already): `chmod +x run_host_service.sh`
+    *   Execute the run script:
         ```bash
-        python app.py
+        ./run_host_service.sh
         ```
-    *   You should see output similar to this, indicating the server is running:
+    *   You should see output from Waitress indicating it's serving the app on `http://0.0.0.0:5001`. The Flask development server warning should **not** appear.
         ```
          * Serving Flask app 'app'
          * Debug mode: on
