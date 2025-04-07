@@ -55,10 +55,15 @@ graph TD
 1.  **Node.js:** Version 16 or later recommended.
 2.  **npm** or **yarn:** Package manager for Node.js.
 3.  Network connectivity to the host machine where `pandoc-host-service` is running.
-4.  **Environment Variable:** The `PANDOC_HOST_URL` environment variable **must** be set when running this container service. It should contain the full URL (including port) needed to reach the `pandoc-host-service` from within the container. Examples:
-    *   Docker Desktop (Mac/Win): `http://host.docker.internal:5001`
-    *   Linux (typical bridge network): `http://172.17.0.1:5001` (Verify the IP address of your `docker0` or relevant bridge interface on the host).
-    *   Other setups: Use the appropriate IP address or hostname accessible from the container.
+4.  **Host Service URL Configuration:** The `PANDOC_HOST_URL` **must** be configured so this service knows how to reach the `pandoc-host-service`. There are two primary ways:
+    *   **`.env` File (Recommended for Local Development):**
+        *   Copy the `.env.example` file in this directory to a new file named `.env`.
+        *   Edit the `.env` file and set `PANDOC_HOST_URL` to the correct URL for your host service (e.g., `http://host.docker.internal:5001` or `http://172.17.0.1:5001`).
+        *   The server will automatically load this value when it starts.
+    *   **External Environment Variable (Recommended for Deployment):**
+        *   Set the `PANDOC_HOST_URL` environment variable in the execution environment (e.g., Docker, Docker Compose, LibreChat config, systemd service).
+        *   **Note:** If an external `PANDOC_HOST_URL` environment variable is set, it will **override** any value found in the `.env` file.
+    *   **Failure to configure this variable** (either via `.env` or externally) will cause the server to log an error and fail to process conversion requests.
 
 ## Setup and Running
 
@@ -117,25 +122,21 @@ graph TD
     yarn build
     ```
     This creates the `dist/server.js` file.
-4.  **Set the Environment Variable:** Before running, ensure the `PANDOC_HOST_URL` environment variable is set in the container's environment.
-    ```bash
-    # Example (replace with the correct URL for your setup)
-    export PANDOC_HOST_URL="http://host.docker.internal:5001"
-    ```
+4.  **Configure Host Service URL:** Ensure `PANDOC_HOST_URL` is configured using one of the methods described in the "Prerequisites" section (either create and edit a `.env` file or set the environment variable externally).
 5.  Run the MCP server (e.g., via LibreChat configuration or directly):
     ```bash
-    # Ensure PANDOC_HOST_URL is set in this shell or passed via the execution method
+    # The server will load PANDOC_HOST_URL from .env or the external environment
     npm start
     # or
     yarn start
     # or directly
     node dist/server.js
     ```
-    This server will listen on stdin for MCP requests and forward conversion tasks to the host service using the URL specified in `PANDOC_HOST_URL`. If the variable is not set, the server will log an error and fail to process requests.
+    This server will listen on stdin for MCP requests and forward conversion tasks to the host service using the configured `PANDOC_HOST_URL`. If the variable is not configured (via `.env` or external environment), the server will log an error and fail to process requests.
 
 ## MCP Integration (Example for LibreChat)
 
-Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. **Crucially, you must configure the client or the container environment to set the `PANDOC_HOST_URL` environment variable** so that this server knows how to reach the `pandoc-host-service`.
+Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. You can configure the `PANDOC_HOST_URL` either by creating a `.env` file alongside `dist/server.js` within the container, or (more commonly for deployment) by setting the environment variable via the MCP client's configuration (which will override the `.env` file if present).
 
 Example configuration snippet (adapt path as needed):
 
@@ -160,7 +161,7 @@ Example configuration snippet (adapt path as needed):
 *   **Description:** Converts content between different formats by sending requests to the host Pandoc service.
 *   **🚨 CRITICAL REQUIREMENTS:**
     *   The `pandoc-host-service` must be running on the host machine.
-    *   The `PANDOC_HOST_URL` environment variable must be correctly set when launching this server, pointing to the running `pandoc-host-service`.
+    *   The `PANDOC_HOST_URL` must be correctly configured (via `.env` file or external environment variable) when launching this server, pointing to the running `pandoc-host-service`.
     *   Host machine requires Pandoc (and TeX Live for PDF).
 *   **Current Limitations:**
     *   Only `contents` input is supported. `input_file` is **not** currently handled due to path complexities between container and host.
