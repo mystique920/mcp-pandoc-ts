@@ -1,0 +1,165 @@
+# mcp-pandoc-ts: A Document Conversion MCP Server (TypeScript/Host Service Version)
+
+This project provides document conversion capabilities via the Model Context Protocol (MCP). It uses a **two-component architecture**:
+
+1.  **`mcp-pandoc-ts` (This Directory):** A TypeScript-based MCP server designed to run inside a container (e.g., within LibreChat). It receives MCP requests via stdio.
+2.  **`pandoc-host-service` (Separate Directory):** A Python Flask service designed to run on the **host machine**. It listens for HTTP requests from the container service and executes the host's `pandoc` command.
+
+This architecture allows leveraging a `pandoc` installation on the host machine without needing to install it inside the container.
+
+**Based on:** [vivekVells/mcp-pandoc](https://github.com/vivekVells/mcp-pandoc) (Original Python version)
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    A[MCP Client Request (LibreChat)] --> B(mcp-pandoc-ts Server [Container]);
+    B -- Reads stdin --> C{Parse MCP Message};
+    C -- type: list_tools --> D[Return Tool Definition];
+    C -- type: call_tool --> E{Validate Args};
+    E -- Valid --> F[Construct JSON Payload];
+    E -- Invalid --> G[Return MCP Error Response];
+    F -- HTTP POST (host.docker.internal:5001) --> H(Pandoc Host Service [Host Machine]);
+    H -- Executes --> I(Host Pandoc CLI);
+    I -- Result --> H;
+    H -- HTTP Response --> F;
+    F -- Process Response --> J{Format MCP Response};
+    J -- Writes stdout --> A;
+    G -- Writes stdout --> A;
+
+    subgraph Container Boundary
+        B; C; D; E; F; G; J;
+    end
+
+    subgraph Host Machine
+        H; I;
+    end
+
+    style G fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+## Prerequisites
+
+**For the Host Machine (running `pandoc-host-service`):**
+
+1.  **Python:** Version 3.7+ recommended.
+2.  **pip:** Python package installer.
+3.  **Pandoc:** The core conversion tool. Must be installed and accessible in your system's PATH. See [pandoc installation instructions](https://pandoc.org/installing.html).
+4.  **TeX Live / MiKTeX (for PDF output):** Required *only* if you need to convert documents to PDF format via the host service.
+    *   **Ubuntu/Debian:** `sudo apt-get install texlive-xetex`
+    *   **macOS:** `brew install texlive`
+    *   **Windows:** Install [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/).
+
+**For the Container Environment (running `mcp-pandoc-ts`):**
+
+1.  **Node.js:** Version 16 or later recommended.
+2.  **npm** or **yarn:** Package manager for Node.js.
+3.  Network connectivity to the host machine (Docker Desktop usually provides `host.docker.internal`).
+
+## Setup and Running
+
+**Step 1: Set up and Run the Host Service (`pandoc-host-service`)**
+
+1.  Navigate to the `pandoc-host-service` directory (sibling to `mcp-pandoc-ts`) on your **host machine**.
+2.  (Recommended) Create and activate a Python virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    ```
+3.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Run the Flask service:**
+    *   Open a **new, separate terminal window** on your host machine (do not reuse the terminal where you might run LibreChat or Docker commands).
+    *   Ensure you are still inside the `pandoc-host-service` directory and that your virtual environment (if created) is active.
+    *   Execute the following command:
+        ```bash
+        python app.py
+        ```
+    *   You should see output similar to this, indicating the server is running:
+        ```
+         * Serving Flask app 'app'
+         * Debug mode: on
+         * Running on all addresses (0.0.0.0)
+         * Running on http://127.0.0.1:5001
+         * Running on http://[your-local-ip]:5001
+        Press CTRL+C to quit
+         * Restarting with stat
+         * Debugger is active!
+         * Debugger PIN: ...
+        ```
+    *   **Important:** This terminal window **must remain open** for the host service to keep running and handle requests from the `mcp-pandoc-ts` container service. If you close this terminal, the host service stops.
+    *   **(Optional - Advanced):** For a more permanent setup where the service runs even after closing the terminal, consider using tools like `nohup` (`nohup python app.py &amp;`), `screen`, or `tmux`, or setting it up as a system service.
+    ```bash
+    python app.py
+    ```
+    The service should start listening on `http://0.0.0.0:5001`. Keep this terminal running.
+
+**Step 2: Set up and Run the Container Service (`mcp-pandoc-ts`)**
+
+1.  Navigate to the `mcp-pandoc-ts` directory (this directory).
+2.  Install dependencies:
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+3.  Compile the TypeScript code:
+    ```bash
+    npm run build
+    # or
+    yarn build
+    ```
+    This creates the `dist/server.js` file.
+4.  Run the MCP server (e.g., via LibreChat configuration or directly):
+    ```bash
+    npm start
+    # or
+    yarn start
+    # or directly
+    node dist/server.js
+    ```
+    This server will listen on stdin for MCP requests and forward conversion tasks to the running host service.
+
+## MCP Integration (Example for LibreChat)
+
+Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. Ensure the container running LibreChat can reach the host service at `host.docker.internal:5001`.
+
+Example configuration snippet (adapt path as needed):
+
+```json
+{
+  "mcpServers": {
+    "mcp-pandoc-ts": {
+      "command": "node",
+      "args": ["/path/to/your/mcp-pandoc-ts/dist/server.js"]
+    }
+  }
+}
+```
+
+## Tools
+
+### `convert-contents`
+
+*   **Description:** Converts content between different formats by sending requests to the host Pandoc service.
+*   **🚨 CRITICAL REQUIREMENTS:**
+    *   The `pandoc-host-service` must be running on the host machine.
+    *   The container must be able to reach the host service (e.g., via `host.docker.internal:5001`).
+    *   Host machine requires Pandoc (and TeX Live for PDF).
+*   **Current Limitations:**
+    *   Only `contents` input is supported. `input_file` is **not** currently handled due to path complexities between container and host.
+    *   `output_file` is only fully supported for basic formats (`txt`, `html`, `markdown`) where the converted content is returned to the container and saved there. Requesting `output_file` for advanced formats (`pdf`, `docx`, etc.) will result in an error as the host service cannot directly write to container paths.
+*   **Supported Formats (via host):** `markdown`, `html`, `pdf`, `docx`, `rst`, `latex`, `epub`, `txt`
+*   **Input Schema:**
+    *   `contents` (string): Content to convert (**required**).
+    *   `input_file` (string): **NOT CURRENTLY SUPPORTED.**
+    *   `input_format` (string, optional, default: `markdown`): Source format.
+    *   `output_format` (string, optional, default: `markdown`): Target format.
+    *   `output_file` (string, optional): Absolute path *within the container* to save output. Only functional for basic formats (`txt`, `html`, `markdown`).
+
+## Development
+
+*   **Container Service:** Source code is in `mcp-pandoc-ts/src`. Run `npm run build` to compile.
+*   **Host Service:** Source code is in `pandoc-host-service`. Run `python app.py` to start.
