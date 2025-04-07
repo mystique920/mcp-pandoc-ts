@@ -55,15 +55,13 @@ graph TD
 1.  **Node.js:** Version 16 or later recommended.
 2.  **npm** or **yarn:** Package manager for Node.js.
 3.  Network connectivity to the host machine where `pandoc-host-service` is running.
-4.  **Host Service URL Configuration:** The `PANDOC_HOST_URL` **must** be configured so this service knows how to reach the `pandoc-host-service`. There are two primary ways:
-    *   **`.env` File (Recommended for Local Development):**
-        *   Copy the `.env.example` file in this directory to a new file named `.env`.
-        *   Edit the `.env` file and set `PANDOC_HOST_URL` to the correct URL for your host service (e.g., `http://host.docker.internal:5001` or `http://172.17.0.1:5001`).
-        *   The server will automatically load this value when it starts.
-    *   **External Environment Variable (Recommended for Deployment):**
-        *   Set the `PANDOC_HOST_URL` environment variable in the execution environment (e.g., Docker, Docker Compose, LibreChat config, systemd service).
-        *   **Note:** If an external `PANDOC_HOST_URL` environment variable is set, it will **override** any value found in the `.env` file.
-    *   **Failure to configure this variable** (either via `.env` or externally) will cause the server to log an error and fail to process conversion requests.
+4.  **Host Service URL Configuration (CRITICAL):** This server **must** know the URL of the running `pandoc-host-service`. This is configured via the `PANDOC_HOST_URL` environment variable.
+    *   **Deployment (e.g., LibreChat, Docker Compose):** **Set the `PANDOC_HOST_URL` environment variable directly in your deployment configuration.** This is the **recommended and most reliable method** for deployed environments. See the "MCP Integration" section for an example. This method overrides any `.env` file.
+    *   **Local Development/Testing:** For convenience during local development *only*, you can create a `.env` file in the project root (copy `.env.example` to `.env`) and set the `PANDOC_HOST_URL` there. The server will load this value if no external environment variable is set.
+    *   **Value Examples:**
+        *   Docker Desktop (Mac/Win): `http://host.docker.internal:5001`
+        *   Linux (typical bridge network): `http://172.17.0.1:5001` (Verify host IP on Docker network)
+    *   **Failure to configure this variable** (either externally or via `.env` for local testing) will prevent the server from contacting the host service and result in errors.
 
 ## Setup and Running
 
@@ -136,7 +134,7 @@ graph TD
 
 ## MCP Integration (Example for LibreChat)
 
-Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. You can configure the `PANDOC_HOST_URL` either by creating a `.env` file alongside `dist/server.js` within the container, or (more commonly for deployment) by setting the environment variable via the MCP client's configuration (which will override the `.env` file if present).
+Configure your MCP client (LibreChat, or similar) to launch the `mcp-pandoc-ts` server using Node.js. **The recommended and most reliable way to configure the connection is by setting the `PANDOC_HOST_URL` environment variable directly within the MCP client's configuration for this server.** This ensures the setting is correctly applied in the deployment environment.
 
 Example configuration snippet (adapt path as needed):
 
