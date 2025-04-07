@@ -12,7 +12,7 @@
 
 ## Current Focus
 
-*   Task completed.
+*   Clean up Git history to establish the current state as the new baseline for the `main` branch.
 
 ## Recent Changes
 
@@ -23,6 +23,7 @@
 *   [2025-04-07 13:32:19] Updated `mcp-pandoc-ts` to receive base64 content, decode it, and save to specified `output_file` in container.
 *   [2025-04-07 14:06:54] Confirmed PDF conversion and file saving works correctly end-to-end.
 *   [2025-04-07 14:07:15] Updated Memory Bank (`progress.md`).
+*   [2025-04-07 15:04:00] [Architect/Code] Decided to treat the TS rewrite as a new Git baseline, replacing the old `main` branch history. Updated `decisionLog.md`.
 
 ## Architectural Notes / Limitations
 

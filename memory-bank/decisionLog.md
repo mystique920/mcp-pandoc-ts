@@ -54,3 +54,19 @@ This file records architectural and implementation decisions using a list format
 *   Modified `mcp-pandoc-ts/src/server.ts` to remove `child_process` logic and add `axios` calls to `http://host.docker.internal:5001/convert`.
 *   Updated `mcp-pandoc-ts/README.md` to reflect the new architecture and setup instructions.
 *   Current limitations: Host service primarily handles `contents` input; `input_file`/`output_file` handling across boundaries is restricted.
+
+## Decision
+
+*   [2025-04-07 15:04:00] Treat the TypeScript rewrite as a new project baseline in Git, detaching the `main` branch history from the original Python-only version.
+
+## Rationale
+
+*   The project structure and core language have completely changed (Python -> TypeScript + Python Host Service).
+*   The user explicitly stated the desire to not link the new version to the old one in Git history.
+*   Merging the branch with deleted files into the old `main` would retain irrelevant history. Replacing `main` provides a cleaner starting point for the new project structure.
+
+## Implementation Details
+
+*   Commit the deletion of old Python files on the current feature branch.
+*   Force-rename the feature branch to `main` locally (`git branch -M main`).
+*   Force-push the new `main` branch to the remote repository (`git push origin main --force`), overwriting the previous `main` history. This requires caution.

@@ -24,12 +24,13 @@ This file tracks the project's progress using a task list format.
 *   [2025-04-07 13:31:57] [Code] Implemented file output handling (PDF etc.) via base64 transfer between host and container services.
 *   [2025-04-07 14:06:54] [User Feedback] Confirmed PDF conversion and file saving works correctly.
 *   [2025-04-07 14:07:02] [Code] Updated Memory Bank (`decisionLog.md`, `progress.md`, `activeContext.md`, `systemPatterns.md`, `productContext.md`).
+*   [2025-04-07 15:04:00] [Architect/Code] Decided on Git strategy: Treat TS rewrite as new baseline, replace `main` history. Updated `decisionLog.md`, `activeContext.md`.
 
 
 ## Current Tasks
 
-*   [Code] Attempt completion.
+*   [Code] Execute Git cleanup: Commit deletions, rename current branch to `main`, force-push `main`.
 
 ## Next Steps
 
-*   (None - Task Complete)
+*   Confirm successful Git cleanup and push.

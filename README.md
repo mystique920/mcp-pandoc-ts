@@ -1,271 +1,166 @@
-# mcp-pandoc: A Document Conversion MCP Server
+# mcp-pandoc-ts: A Document Conversion MCP Server (TypeScript/Host Service Version)
 
-> Officially included in the [Model Context Protocol servers](https://github.com/modelcontextprotocol/servers/blob/main/README.md) open-source project. 🎉
+This project provides document conversion capabilities via the Model Context Protocol (MCP). It uses a **two-component architecture**:
 
-<a href="https://glama.ai/mcp/servers/xyzzgaj9bk"><img width="380" height="200" src="https://glama.ai/mcp/servers/xyzzgaj9bk/badge" /></a>
-<a href="https://smithery.ai/server/mcp-pandoc"><img alt="Smithery Badge" src="https://smithery.ai/badge/mcp-pandoc"></a>
+1.  **`mcp-pandoc-ts` (This Directory):** A TypeScript-based MCP server designed to run inside a container (e.g., within LibreChat). It receives MCP requests via stdio.
+2.  **`pandoc-host-service` (Separate Directory):** A Python Flask service designed to run on the **host machine**. It listens for HTTP requests from the container service and executes the host's `pandoc` command.
 
-## Overview
+This architecture allows leveraging a `pandoc` installation on the host machine without needing to install it inside the container.
 
-A Model Context Protocol server for document format conversion using [pandoc](https://pandoc.org/index.html). This server provides tools to transform content between different document formats while preserving formatting and structure.
+**Based on:** [vivekVells/mcp-pandoc](https://github.com/vivekVells/mcp-pandoc) (Original Python version)
 
-Please note that mcp-pandoc is currently in early development. PDF support is under development, and the functionality and available tools are subject to change and expansion as we continue to improve the server.
+## Architecture Overview
 
-Credit: This project uses the [Pandoc Python package](https://pypi.org/project/pandoc/) for document conversion, forming the foundation for this project.
+```mermaid
+graph TD
+    A[MCP Client Request (LibreChat)] --> B(mcp-pandoc-ts Server [Container]);
+    B -- Reads stdin --> C{Parse MCP Message};
+    C -- type: list_tools --> D[Return Tool Definition];
+    C -- type: call_tool --> E{Validate Args};
+    E -- Valid --> F[Construct JSON Payload];
+    E -- Invalid --> G[Return MCP Error Response];
+    F -- HTTP POST (host.docker.internal:5001) --> H(Pandoc Host Service [Host Machine]);
+    H -- Executes --> I(Host Pandoc CLI);
+    I -- Result --> H;
+    H -- HTTP Response --> F;
+    F -- Process Response --> J{Format MCP Response};
+    J -- Writes stdout --> A;
+    G -- Writes stdout --> A;
 
-## Demo
+    subgraph Container Boundary
+        B; C; D; E; F; G; J;
+    end
 
-[![mcp-pandoc - v1: Seamless Document Format Conversion for Claude using MCP server](https://img.youtube.com/vi/vN3VOb0rygM/maxresdefault.jpg)](https://youtu.be/vN3VOb0rygM)
+    subgraph Host Machine
+        H; I;
+    end
 
-> 🎥 [Watch on YouTube](https://youtu.be/vN3VOb0rygM)
+    style G fill:#f9f,stroke:#333,stroke-width:2px
+```
 
-<details>
-<summary>Screenshots</summary>
+## Prerequisites
 
-<img width="2407" alt="Screenshot 2024-12-26 at 3 33 54 PM" src="https://github.com/user-attachments/assets/ce3f5396-252a-4bba-84aa-65b2a06b859e" />
-<img width="2052" alt="Screenshot 2024-12-26 at 3 38 24 PM" src="https://github.com/user-attachments/assets/8c525ad1-b184-41ca-b068-7dd34b60b85d" />
-<img width="1498" alt="Screenshot 2024-12-26 at 3 40 51 PM" src="https://github.com/user-attachments/assets/a1e0682d-fe44-40b6-9988-bf805627beeb" />
-<img width="760" alt="Screenshot 2024-12-26 at 3 41 20 PM" src="https://github.com/user-attachments/assets/1d7f5998-6d7f-48fa-adcf-fc37d0521213" />
-<img width="1493" alt="Screenshot 2024-12-26 at 3 50 27 PM" src="https://github.com/user-attachments/assets/97992c5d-8efc-40af-a4c3-94c51c392534" />
-</details>
+**For the Host Machine (running `pandoc-host-service`):**
 
-More to come...
+1.  **Python:** Version 3.7+ recommended.
+2.  **pip:** Python package installer.
+3.  **Pandoc:** The core conversion tool. Must be installed and accessible in your system's PATH. See [pandoc installation instructions](https://pandoc.org/installing.html).
+4.  **TeX Live / MiKTeX (for PDF output):** Required *only* if you need to convert documents to PDF format via the host service.
+    *   **Ubuntu/Debian:** `sudo apt-get install texlive-xetex`
+    *   **macOS:** `brew install texlive`
+    *   **Windows:** Install [MiKTeX](https://miktex.org/) or [TeX Live](https://tug.org/texlive/).
 
-## Tools
+**For the Container Environment (running `mcp-pandoc-ts`):**
 
-1. `convert-contents`
-   - Transforms content between supported formats
-   - Inputs:
-     - `contents` (string): Source content to convert (required if input_file not provided)
-     - `input_file` (string): Complete path to input file (required if contents not provided)
-     - `input_format` (string): Source format of the content (defaults to markdown)
-     - `output_format` (string): Target format (defaults to markdown)
-     - `output_file` (string): Complete path for output file (required for pdf, docx, rst, latex, epub formats)
-   - Supported input/output formats:
-     - markdown
-     - html
-     - pdf
-     - docx
-     - rst
-     - latex
-     - epub
-     - txt
-   - Note: For advanced formats (pdf, docx, rst, latex, epub), an output_file path is required
+1.  **Node.js:** Version 16 or later recommended.
+2.  **npm** or **yarn:** Package manager for Node.js.
+3.  Network connectivity to the host machine (Docker Desktop usually provides `host.docker.internal`).
 
-### Supported Formats
+## Setup and Running
 
-Currently supported formats:
+**Step 1: Set up and Run the Host Service (`pandoc-host-service`)**
 
-Basic formats (direct conversion):
+1.  Navigate to the `pandoc-host-service` directory (sibling to `mcp-pandoc-ts`) on your **host machine**.
+2.  (Recommended) Create and activate a Python virtual environment:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    ```
+3.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **Run the Host Service using Waitress:**
+    *   Open a **new, separate terminal window** on your host machine.
+    *   Ensure you are still inside the `pandoc-host-service` directory and that your virtual environment (if created) is active.
+    *   Make the run script executable (if you haven't already): `chmod +x run_host_service.sh`
+    *   Execute the run script:
+        ```bash
+        ./run_host_service.sh
+        ```
+    *   You should see output from Waitress indicating it's serving the app on `http://0.0.0.0:5001`. The Flask development server warning should **not** appear.
+        ```
+         * Serving Flask app 'app'
+         * Debug mode: on
+         * Running on all addresses (0.0.0.0)
+         * Running on http://127.0.0.1:5001
+         * Running on http://[your-local-ip]:5001
+        Press CTRL+C to quit
+         * Restarting with stat
+         * Debugger is active!
+         * Debugger PIN: ...
+        ```
+    *   **Important:** This terminal window **must remain open** for the host service to keep running and handle requests from the `mcp-pandoc-ts` container service. If you close this terminal, the host service stops.
+    *   **(Optional - Advanced):** For a more permanent setup where the service runs even after closing the terminal, consider using tools like `nohup` (`nohup python app.py &amp;`), `screen`, or `tmux`, or setting it up as a system service.
+    ```bash
+    python app.py
+    ```
+    The service should start listening on `http://0.0.0.0:5001`. Keep this terminal running.
 
-- Plain text (.txt)
-- Markdown (.md)
-- HTML (.html)
+**Step 2: Set up and Run the Container Service (`mcp-pandoc-ts`)**
 
-Advanced formats (requires complete file paths):
+1.  Navigate to the `mcp-pandoc-ts` directory (this directory).
+2.  Install dependencies:
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+3.  Compile the TypeScript code:
+    ```bash
+    npm run build
+    # or
+    yarn build
+    ```
+    This creates the `dist/server.js` file.
+4.  Run the MCP server (e.g., via LibreChat configuration or directly):
+    ```bash
+    npm start
+    # or
+    yarn start
+    # or directly
+    node dist/server.js
+    ```
+    This server will listen on stdin for MCP requests and forward conversion tasks to the running host service.
 
-- PDF (.pdf) - requires TeX Live installation
-- DOCX (.docx)
-- RST (.rst)
-- LaTeX (.tex)
-- EPUB (.epub)
+## MCP Integration (Example for LibreChat)
 
-Note: For advanced formats:
+Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. Ensure the container running LibreChat can reach the host service at `host.docker.internal:5001`.
 
-1. Complete file paths with filename and extension are required
-2. **PDF conversion requires TeX Live installation** (see Critical Requirements section -> For macOS: `brew install texlive`)
-3. When no output path is specified:
-   - Basic formats: Displays converted content in the chat
-   - Advanced formats: May save in system temp directory (/tmp/ on Unix systems)
+Example configuration snippet (adapt path as needed):
 
-## Usage & configuration
-
-To use the published one
-
-```bash
+```json
 {
   "mcpServers": {
-    "mcp-pandoc": {
-      "command": "uvx",
-      "args": ["mcp-pandoc"]
+    "mcp-pandoc-ts": {
+      "command": "node",
+      "args": ["/path/to/your/mcp-pandoc-ts/dist/server.js"]
     }
   }
 }
 ```
 
-### ⚠️ Important Notes
+## Tools
 
-#### Critical Requirements
+### `convert-contents`
 
-1. **PDF Conversion Prerequisites**
-   - TeX Live must be installed before attempting PDF conversion
-   - Installation commands:
-
-     ```bash
-     # Ubuntu/Debian
-     sudo apt-get install texlive-xetex
-
-     # macOS
-     brew install texlive
-
-     # Windows
-     # Install MiKTeX or TeX Live from:
-     # https://miktex.org/ or https://tug.org/texlive/
-     ```
-
-2. **File Path Requirements**
-   - When saving or converting files, you MUST provide complete file paths including filename and extension
-   - The tool does not automatically generate filenames or extensions
-
-#### Examples
-
-✅ Correct Usage:
-
-```bash
-# Converting content to PDF
-"Convert this text to PDF and save as /path/to/document.pdf"
-
-# Converting between file formats
-"Convert /path/to/input.md to PDF and save as /path/to/output.pdf"
-```
-
-❌ Incorrect Usage:
-
-```bash
-# Missing filename and extension
-"Save this as PDF in /documents/"
-
-# Missing complete path
-"Convert this to PDF"
-
-# Missing extension
-"Save as /documents/story"
-```
-
-#### Common Issues and Solutions
-
-1. **PDF Conversion Fails**
-   - Error: "xelatex not found"
-   - Solution: Install TeX Live first (see installation commands above)
-
-2. **File Conversion Fails**
-   - Error: "Invalid file path"
-   - Solution: Provide complete path including filename and extension
-   - Example: `/path/to/document.pdf` instead of just `/path/to/`
-
-3. **Format Conversion Fails**
-   - Error: "Unsupported format"
-   - Solution: Use only supported formats:
-     - Basic: txt, html, markdown
-     - Advanced: pdf, docx, rst, latex, epub
-
-## Quickstart
-
-### Install
-
-#### Option 1: Installing manually via claude_desktop_config.json config file
-
-- On MacOS: `open ~/Library/Application\ Support/Claude/claude_desktop_config.json`
-- On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
-
-<details>
-  <summary>Development/Unpublished Servers Configuration</summary>
-
-  ℹ️ Replace <DIRECTORY> with your locally cloned project path
-  
-  ```bash
-  "mcpServers": {
-    "mcp-pandoc": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "<DIRECTORY>/mcp-pandoc",
-        "run",
-        "mcp-pandoc"
-      ]
-    }
-  }
-  ```
-  
-</details>
-
-<details>
-  <summary>Published Servers Configuration</summary>
-
-  ```bash
-  "mcpServers": {
-    "mcp-pandoc": {
-      "command": "uvx",
-      "args": [
-        "mcp-pandoc"
-      ]
-    }
-  }
-  ```
-
-</details>
-
-#### Option 2: To install Published Servers Configuration automatically via Smithery
-
-Run the following bash command to install **published** [mcp-pandoc pypi](https://pypi.org/project/mcp-pandoc) for Claude Desktop automatically via [Smithery](https://smithery.ai/server/mcp-pandoc):
-
-```bash
-npx -y @smithery/cli install mcp-pandoc --client claude
-```
-
-**Note**: To use locally configured mcp-pandoc, follow "Development/Unpublished Servers Configuration" step above.
+*   **Description:** Converts content between different formats by sending requests to the host Pandoc service.
+*   **🚨 CRITICAL REQUIREMENTS:**
+    *   The `pandoc-host-service` must be running on the host machine.
+    *   The container must be able to reach the host service (e.g., via `host.docker.internal:5001`).
+    *   Host machine requires Pandoc (and TeX Live for PDF).
+*   **Current Limitations:**
+    *   Only `contents` input is supported. `input_file` is **not** currently handled due to path complexities between container and host.
+    *   `output_file` is only fully supported for basic formats (`txt`, `html`, `markdown`) where the converted content is returned to the container and saved there. Requesting `output_file` for advanced formats (`pdf`, `docx`, etc.) will result in an error as the host service cannot directly write to container paths.
+*   **Supported Formats (via host):** `markdown`, `html`, `pdf`, `docx`, `rst`, `latex`, `epub`, `txt`
+*   **Input Schema:**
+    *   `contents` (string): Content to convert (**required**).
+    *   `input_file` (string): **NOT CURRENTLY SUPPORTED.**
+    *   `input_format` (string, optional, default: `markdown`): Source format.
+    *   `output_format` (string, optional, default: `markdown`): Target format.
+    *   `output_file` (string, optional): Absolute path *within the container* to save output. Only functional for basic formats (`txt`, `html`, `markdown`).
 
 ## Development
 
-### Building and Publishing
-
-To prepare the package for distribution:
-
-1. Sync dependencies and update lockfile:
-
-```bash
-uv sync
-```
-
-2. Build package distributions:
-
-```bash
-uv build
-```
-
-This will create source and wheel distributions in the `dist/` directory.
-
-3. Publish to PyPI:
-
-```bash
-uv publish
-```
-
-Note: You'll need to set PyPI credentials via environment variables or command flags:
-
-- Token: `--token` or `UV_PUBLISH_TOKEN`
-- Or username/password: `--username`/`UV_PUBLISH_USERNAME` and `--password`/`UV_PUBLISH_PASSWORD`
-
-### Debugging
-
-Since MCP servers run over stdio, debugging can be challenging. For the best debugging
-experience, we strongly recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
-
-You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
-
-```bash
-npx @modelcontextprotocol/inspector uv --directory /Users/vivekvells/Desktop/code/ai/mcp-pandoc run mcp-pandoc
-```
-
-Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
-
----
-
-## Contributing
-
-We welcome contributions to enhance mcp-pandoc! Here's how you can get involved:
-
-1. **Report Issues**: Found a bug or have a feature request? Open an issue on our [GitHub Issues](https://github.com/vivekVells/mcp-pandoc/issues) page.
-2. **Submit Pull Requests**: Improve the codebase or add features by creating a pull request.
-
----
+*   **Container Service:** Source code is in `mcp-pandoc-ts/src`. Run `npm run build` to compile.
+*   **Host Service:** Source code is in `pandoc-host-service`. Run `python app.py` to start.
