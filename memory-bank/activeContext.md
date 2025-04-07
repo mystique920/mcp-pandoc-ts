@@ -6,31 +6,33 @@
   2025-04-07 07:03:22 - Updated after initial TS implementation.
   2025-04-07 07:34:56 - Updated after architectural pivot to host-service model.
   2025-04-07 09:20:24 - Updated after successful initialization debugging.
+  2025-04-07 14:07:21 - Updated after implementing PDF/file output support.
 
 *
 
 ## Current Focus
 
-*   Attempt task completion.
+*   Task completed.
 
 ## Recent Changes
 
 *   [2025-04-07 06:51:24] Initialized the Memory Bank.
 *   ... (previous entries) ...
-*   [2025-04-07 07:34:53] Updated Memory Bank (`decisionLog.md`, `progress.md`).
-*   [2025-04-07 09:11:52] Refactored `mcp-pandoc-ts` to use `@modelcontextprotocol/sdk`.
-*   [2025-04-07 09:18:11] Debugged SDK implementation (fixed `initialize` and `tools/list` response formats).
 *   [2025-04-07 09:19:57] Confirmed successful initialization of `mcp-pandoc-ts` server in LibreChat.
-*   [2025-04-07 09:20:20] Updated Memory Bank (`progress.md`).
+*   [2025-04-07 13:31:57] Implemented file output handling (PDF etc.) in `pandoc-host-service` (generates temp file, returns base64 content).
+*   [2025-04-07 13:32:19] Updated `mcp-pandoc-ts` to receive base64 content, decode it, and save to specified `output_file` in container.
+*   [2025-04-07 14:06:54] Confirmed PDF conversion and file saving works correctly end-to-end.
+*   [2025-04-07 14:07:15] Updated Memory Bank (`progress.md`).
 
 ## Architectural Notes / Limitations
 
-*   The system now relies on two components: `mcp-pandoc-ts` (container) and `pandoc-host-service` (host). Both must be running.
+*   The system relies on two components: `mcp-pandoc-ts` (container) and `pandoc-host-service` (host). Both must be running.
 *   Communication is via HTTP from container to host (`host.docker.internal:5001`).
-*   Current implementation primarily supports conversion via `contents` input. Handling `input_file` and `output_file` across the container/host boundary is limited/not fully supported due to path complexities.
+*   File-based output formats (PDF, DOCX, etc.) are supported by generating the file on the host, transferring content via base64, and saving within the container if `output_file` is specified.
+*   `input_file` parameter is currently **not supported** due to host/container path complexities. Only `contents` input works.
 
 ## Open Questions/Issues
 
 *   (Resolved) Integration with LibreChat: Confirmed as launching compiled JS with `node` and using stdio via MCP SDK.
 *   (Resolved) Preferred Libraries: Now using MCP SDK.
-*   (Resolved) Functionality Scope: Confirmed as replicating existing Python server functionality (now via host service).
+*   (Resolved) Functionality Scope: Confirmed as replicating existing Python server functionality (now via host service, including file output).

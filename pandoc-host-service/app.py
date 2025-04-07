@@ -2,6 +2,8 @@ import os
 import tempfile
 import shutil
 import pypandoc
+import base64
+import uuid
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -47,20 +49,49 @@ def handle_convert():
     # TODO: Add error handling for pandoc execution
 
     # Example using pypandoc.convert_text (needs error handling)
+    temp_output_file = None # Initialize to ensure cleanup check works
     try:
         # Prepare extra args if needed (e.g., for PDF)
         extra_args = []
         if output_format == 'pdf':
              extra_args.extend(['--pdf-engine=xelatex', '-V', 'geometry:margin=1in'])
-             # Note: PDF output cannot be returned as string directly, would need file handling
 
-        if output_format in ['pdf', 'docx', 'epub', 'rst', 'latex']: # Added missing advanced formats to check
-             # This flow is complex because output_file is a container path.
-             # Simplest for now: return error if file output requested but not implemented.
-             app.logger.warning(f"Rejecting request for file-based output format: {output_format}")
-             return jsonify({"error": f"Output format '{output_format}' requires file output, which is not fully supported in this host service setup yet."}), 501 # Not Implemented
+        # Define formats requiring file output on host
+        FILE_OUTPUT_FORMATS = ['pdf', 'docx', 'epub', 'odt', 'pptx'] # Common binary/complex formats
+
+        if output_format in FILE_OUTPUT_FORMATS:
+            app.logger.info(f"Handling file output format: {output_format}")
+            # Generate a unique temporary file path on the host
+            temp_filename = f"{uuid.uuid4()}.{output_format}"
+            temp_output_file = os.path.join(TEMP_DIR, temp_filename)
+            app.logger.info(f"Generating temporary host file: {temp_output_file}")
+
+            # Convert text content to a file on the host
+            pypandoc.convert_text(
+                source=contents,
+                to=output_format,
+                format=input_format,
+                outputfile=temp_output_file,
+                extra_args=extra_args
+            )
+            app.logger.info(f"Successfully created temporary file: {temp_output_file}")
+
+            # Read the binary content of the generated file
+            with open(temp_output_file, 'rb') as f:
+                file_content_binary = f.read()
+
+            # Encode content as base64 string for JSON transfer
+            file_content_base64 = base64.b64encode(file_content_binary).decode('utf-8')
+            app.logger.info(f"Read and base64 encoded file content (length: {len(file_content_base64)} chars).")
+
+            return jsonify({
+                "message": "File generated successfully on host",
+                "file_content_base64": file_content_base64,
+                "output_format": output_format # Include format for potential decoding hints
+            }), 200
+
         else:
-            # Convert text to text format
+            # Convert text to text format (e.g., html, markdown, rst, latex, txt)
             app.logger.info(f"Attempting text conversion: from='{input_format}' to='{output_format}' with extra_args={extra_args}")
             converted_output = pypandoc.convert_text(
                 source=contents,
@@ -71,13 +102,21 @@ def handle_convert():
             app.logger.info(f"Text conversion successful. Output length: {len(converted_output)}")
             return jsonify({
                 "message": "Conversion successful (via host service)",
-                "converted_content": converted_output
+                "converted_content": converted_output # Return plain text
             }), 200
 
     except Exception as e:
         # Catch potential pypandoc errors (pandoc not found, conversion failed, etc.)
-        app.logger.error(f"Pandoc conversion failed: {e}")
+        app.logger.error(f"Pandoc conversion failed: {e}", exc_info=True) # Log traceback
         return jsonify({"error": f"Pandoc conversion failed: {str(e)}"}), 500
+    finally:
+        # Ensure temporary file is deleted if it was created
+        if temp_output_file and os.path.exists(temp_output_file):
+            try:
+                os.remove(temp_output_file)
+                app.logger.info(f"Successfully deleted temporary file: {temp_output_file}")
+            except Exception as e:
+                app.logger.error(f"Error deleting temporary file {temp_output_file}: {e}")
 
 
 @app.route('/health', methods=['GET'])

@@ -136,41 +136,91 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     console.error(`[CallTool] Calling host Pandoc service at ${hostServiceUrl} with payload:`, payload);
 
     try {
-        const response = await axios.post(hostServiceUrl, payload, { timeout: 30000 }); // 30 second timeout
+        const response = await axios.post(hostServiceUrl, payload, { timeout: 30000, responseType: 'json' }); // Explicitly expect JSON
         console.error('[CallTool] Received response from host service:', response.data);
-
-        if (response.status === 200 && response.data?.converted_content) {
-            let resultMessage = response.data.converted_content; // Start with raw content
-
-            // Handle saving basic formats if output_file was requested
-            if (output_file && !ADVANCED_FORMATS.includes(output_format)) {
-                 try {
-                    // Ensure directory exists before writing
-                    const outputDir = path.dirname(output_file);
-                    if (!fs.existsSync(outputDir)) {
-                        fs.mkdirSync(outputDir, { recursive: true });
-                        console.error(`[CallTool] Created output directory: ${outputDir}`);
-                    }
-                    fs.writeFileSync(output_file, resultMessage); // Write the raw content
-                    console.error(`[CallTool] Successfully wrote converted content to container path: ${output_file}`);
-                    // Modify message to indicate saving
-                    resultMessage = `Content successfully converted and saved to: ${output_file}`;
-                 } catch (writeErr: any) {
-                     console.error(`[CallTool] Failed to write content to output_file '${output_file}': ${writeErr.message}`);
-                     // Throw an error that the SDK can format
-                     throw new Error(`Conversion via host succeeded, but failed to write to output file '${output_file}' in container: ${writeErr.message}`); // Throw standard Error
+            // --- DETAILED RESPONSE DATA LOGGING ---
+            console.error(`[CallTool] typeof response.data: ${typeof response.data}`);
+            if (typeof response.data === 'object' && response.data !== null) {
+                 console.error(`[CallTool] Keys in response.data: ${Object.keys(response.data).join(', ')}`);
+                 console.error(`[CallTool] Value of response.data.file_content_base64 exists: ${response.data.hasOwnProperty('file_content_base64')}`);
+                 console.error(`[CallTool] Value of response.data.converted_content exists: ${response.data.hasOwnProperty('converted_content')}`);
+                 if (response.data.hasOwnProperty('converted_content')) {
+                     console.error(`[CallTool] Type of response.data.converted_content: ${typeof response.data.converted_content}`);
+                     console.error(`[CallTool] Length of response.data.converted_content: ${response.data.converted_content?.length ?? 'N/A'}`);
                  }
-            } else if (output_file && ADVANCED_FORMATS.includes(output_format)) {
-                 // This case should ideally not be hit if host service returns error, but handle defensively
-                 console.error(`[CallTool] Warning: output_file specified for advanced format '${output_format}', but host service should have returned an error.`);
-                  throw new Error(`Host service did not return expected error for advanced format '${output_format}' with output_file specified.`); // Throw standard Error
+            } else {
+                 console.error(`[CallTool] response.data is not a non-null object.`);
+            }
+            // --- END DETAILED LOGGING ---
+
+
+        if (response.status === 200) {
+            let resultMessage = "";
+            let fileSaved = false;
+
+            // Check for base64 encoded file content first
+            if (response.data?.file_content_base64) {
+                if (output_file) {
+                    try {
+                        console.error(`[CallTool] Received base64 content for ${response.data.output_format}. Decoding and writing to: ${output_file}`);
+                        const decodedContent = Buffer.from(response.data.file_content_base64, 'base64');
+
+                        // Ensure directory exists before writing
+                        const outputDir = path.dirname(output_file);
+                        if (!fs.existsSync(outputDir)) {
+                            fs.mkdirSync(outputDir, { recursive: true });
+                            console.error(`[CallTool] Created output directory: ${outputDir}`);
+                        }
+
+                        fs.writeFileSync(output_file, decodedContent);
+                        console.error(`[CallTool] Successfully wrote decoded content to container path: ${output_file}`);
+                        resultMessage = `Content successfully converted to ${response.data.output_format || output_format} and saved to: ${output_file}`; // Ensure message is set
+                        fileSaved = true;
+                    } catch (writeErr: any) {
+                        console.error(`[CallTool] Failed to decode/write base64 content to output_file '${output_file}': ${writeErr.message}`);
+                        throw new Error(`Conversion via host succeeded, but failed to decode/write file '${output_file}' in container: ${writeErr.message}`);
+                    }
+                } else {
+                    // Received binary content but no output file specified
+                    console.error(`[CallTool] Error: Received file content from host, but no output_file was specified in the request.`);
+                    throw new Error(`Conversion to ${response.data.output_format} succeeded on host, but 'output_file' was not specified to save the result.`);
+                }
+            }
+            // Check for plain text content
+            else if (response.data?.converted_content) {
+                resultMessage = response.data.converted_content; // Assign raw text content
+                if (output_file) {
+                     // Handle saving plain text formats if output_file was requested
+                     try {
+                        // Ensure directory exists before writing
+                        const outputDir = path.dirname(output_file);
+                        if (!fs.existsSync(outputDir)) {
+                            fs.mkdirSync(outputDir, { recursive: true });
+                            console.error(`[CallTool] Created output directory: ${outputDir}`);
+                        }
+                        fs.writeFileSync(output_file, resultMessage); // Write the plain text
+                        console.error(`[CallTool] Successfully wrote text content to container path: ${output_file}`);
+                        resultMessage = `Content successfully converted and saved to: ${output_file}`; // Update message
+                        fileSaved = true;
+                     } catch (writeErr: any) {
+                         console.error(`[CallTool] Failed to write text content to output_file '${output_file}': ${writeErr.message}`);
+                         throw new Error(`Conversion via host succeeded, but failed to write to output file '${output_file}' in container: ${writeErr.message}`);
+                     }
+                }
+                 // If no output_file for plain text, resultMessage already holds the content
+            }
+            // If neither file nor text content received, something is wrong
+            else if (!fileSaved && !resultMessage) {
+                 console.error(`[CallTool] Host service responded with status 200 but no usable content (file_content_base64 or converted_content). Response data:`, response.data);
+                 throw new Error(`Host service responded successfully but provided no usable content.`);
             }
 
-            // SDK expects an array of content parts
+            // Construct final response for LibreChat
+            console.error(`[CallTool] Preparing final response. fileSaved=${fileSaved}, resultMessage='${resultMessage}'`);
             const responseContent: TextContent[] = [{ type: 'text', text: resultMessage }];
-            return { content: responseContent }; // Use 'content' (singular) key as indicated by client error path
+            return { content: responseContent }; // Use 'content' (singular) key
 
-        } else {
+        } else { // Handle non-200 responses from host service
             // Handle errors reported by the host service
              const errorMessage = response.data?.error || `Host service responded with status ${response.status} but no converted content.`;
              console.error(`[CallTool] Error from host service (Status ${response.status}): ${errorMessage}`);

@@ -6,6 +6,7 @@ This file tracks the project's progress using a task list format.
 2025-04-07 07:03:10 - Updated after initial TS implementation.
 2025-04-07 07:34:43 - Updated after architectural pivot to host-service model.
 2025-04-07 09:20:04 - Updated after successful initialization debugging.
+2025-04-07 14:07:02 - Updated after implementing PDF/file output support.
 
 *
 
@@ -20,7 +21,10 @@ This file tracks the project's progress using a task list format.
 *   [2025-04-07 09:11:52] [Code] Refactored `mcp-pandoc-ts` server to use MCP SDK.
 *   [2025-04-07 09:18:11] [Code] Debugged and fixed MCP SDK implementation issues (initialization response, tools/list response format).
 *   [2025-04-07 09:19:57] [User Feedback] Confirmed `mcp-pandoc-ts` server now initializes successfully in LibreChat.
-*   [2025-04-07 09:20:04] [Code] Updated Memory Bank (`decisionLog.md`, `progress.md`, `activeContext.md`, `systemPatterns.md`, `productContext.md`).
+*   [2025-04-07 13:31:57] [Code] Implemented file output handling (PDF etc.) via base64 transfer between host and container services.
+*   [2025-04-07 14:06:54] [User Feedback] Confirmed PDF conversion and file saving works correctly.
+*   [2025-04-07 14:07:02] [Code] Updated Memory Bank (`decisionLog.md`, `progress.md`, `activeContext.md`, `systemPatterns.md`, `productContext.md`).
+
 
 ## Current Tasks
 
