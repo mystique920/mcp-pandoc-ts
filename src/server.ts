@@ -93,6 +93,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
     // console.error(`[Handler] Received CallTool request for tool: ${name}`); // Removed log
 
+    // --- Get Mandatory Host Service URL ---
+    const hostServiceUrl = process.env.PANDOC_HOST_URL;
+    if (!hostServiceUrl) {
+        console.error("[CallTool] CRITICAL ERROR: PANDOC_HOST_URL environment variable is not set.");
+        throw new Error("Configuration Error: The required PANDOC_HOST_URL environment variable is not set. Cannot connect to the host Pandoc service.");
+    }
+
     if (name !== convertContentsTool.name) {
         // SDK handles unknown tool errors, but good practice to check
         throw new Error(`Tool not found: ${name}`); // Throw standard Error
@@ -126,7 +133,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     // --- Call Host Pandoc Service ---
-    const hostServiceUrl = 'http://host.docker.internal:5001/convert';
+    // const hostServiceUrl = 'http://host.docker.internal:5001/convert'; // Replaced by environment variable
     const payload = {
         contents: contents,
         input_format: input_format,
@@ -225,11 +232,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             if (error.response) {
                 errorMessage = `Host Pandoc service returned error status ${error.response.status}: ${error.response.data?.error || error.message}`;
             } else if (error.request) {
-                errorMessage = `No response received from host Pandoc service at ${hostServiceUrl}. Is it running?`;
+                errorMessage = `No response received from host Pandoc service at ${hostServiceUrl}. Is it running and is PANDOC_HOST_URL correct?`;
             } else if (error.code === 'ECONNREFUSED') {
-                 errorMessage = `Connection refused by host Pandoc service at ${hostServiceUrl}. Is it running on the correct port?`;
+                 errorMessage = `Connection refused by host Pandoc service at ${hostServiceUrl}. Is it running and is PANDOC_HOST_URL correct?`;
             } else if (error.code === 'ETIMEDOUT') {
-                 errorMessage = `Connection timed out to host Pandoc service at ${hostServiceUrl}.`;
+                 errorMessage = `Connection timed out to host Pandoc service at ${hostServiceUrl}. Is PANDOC_HOST_URL correct?`;
                  errorCode = -32001; // Specific timeout code
             }
         }

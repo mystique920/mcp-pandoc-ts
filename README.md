@@ -19,7 +19,7 @@ graph TD
     C -- type: call_tool --> E{Validate Args};
     E -- Valid --> F[Construct JSON Payload];
     E -- Invalid --> G[Return MCP Error Response];
-    F -- HTTP POST (host.docker.internal:5001) --> H(Pandoc Host Service [Host Machine]);
+    F -- HTTP POST ($PANDOC_HOST_URL) --> H(Pandoc Host Service [Host Machine]);
     H -- Executes --> I(Host Pandoc CLI);
     I -- Result --> H;
     H -- HTTP Response --> F;
@@ -54,7 +54,11 @@ graph TD
 
 1.  **Node.js:** Version 16 or later recommended.
 2.  **npm** or **yarn:** Package manager for Node.js.
-3.  Network connectivity to the host machine (Docker Desktop usually provides `host.docker.internal`).
+3.  Network connectivity to the host machine where `pandoc-host-service` is running.
+4.  **Environment Variable:** The `PANDOC_HOST_URL` environment variable **must** be set when running this container service. It should contain the full URL (including port) needed to reach the `pandoc-host-service` from within the container. Examples:
+    *   Docker Desktop (Mac/Win): `http://host.docker.internal:5001`
+    *   Linux (typical bridge network): `http://172.17.0.1:5001` (Verify the IP address of your `docker0` or relevant bridge interface on the host).
+    *   Other setups: Use the appropriate IP address or hostname accessible from the container.
 
 ## Setup and Running
 
@@ -113,19 +117,25 @@ graph TD
     yarn build
     ```
     This creates the `dist/server.js` file.
-4.  Run the MCP server (e.g., via LibreChat configuration or directly):
+4.  **Set the Environment Variable:** Before running, ensure the `PANDOC_HOST_URL` environment variable is set in the container's environment.
     ```bash
+    # Example (replace with the correct URL for your setup)
+    export PANDOC_HOST_URL="http://host.docker.internal:5001"
+    ```
+5.  Run the MCP server (e.g., via LibreChat configuration or directly):
+    ```bash
+    # Ensure PANDOC_HOST_URL is set in this shell or passed via the execution method
     npm start
     # or
     yarn start
     # or directly
     node dist/server.js
     ```
-    This server will listen on stdin for MCP requests and forward conversion tasks to the running host service.
+    This server will listen on stdin for MCP requests and forward conversion tasks to the host service using the URL specified in `PANDOC_HOST_URL`. If the variable is not set, the server will log an error and fail to process requests.
 
 ## MCP Integration (Example for LibreChat)
 
-Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. Ensure the container running LibreChat can reach the host service at `host.docker.internal:5001`.
+Configure your MCP client (LibreChat) to launch the `mcp-pandoc-ts` server using Node.js. **Crucially, you must configure the client or the container environment to set the `PANDOC_HOST_URL` environment variable** so that this server knows how to reach the `pandoc-host-service`.
 
 Example configuration snippet (adapt path as needed):
 
@@ -134,7 +144,10 @@ Example configuration snippet (adapt path as needed):
   "mcpServers": {
     "mcp-pandoc-ts": {
       "command": "node",
-      "args": ["/path/to/your/mcp-pandoc-ts/dist/server.js"]
+      "args": ["/path/to/your/mcp-pandoc-ts/dist/server.js"],
+      "env": {
+        "PANDOC_HOST_URL": "http://host.docker.internal:5001" // <-- SET THIS TO THE CORRECT URL FOR YOUR ENVIRONMENT
+      }
     }
   }
 }
@@ -147,7 +160,7 @@ Example configuration snippet (adapt path as needed):
 *   **Description:** Converts content between different formats by sending requests to the host Pandoc service.
 *   **🚨 CRITICAL REQUIREMENTS:**
     *   The `pandoc-host-service` must be running on the host machine.
-    *   The container must be able to reach the host service (e.g., via `host.docker.internal:5001`).
+    *   The `PANDOC_HOST_URL` environment variable must be correctly set when launching this server, pointing to the running `pandoc-host-service`.
     *   Host machine requires Pandoc (and TeX Live for PDF).
 *   **Current Limitations:**
     *   Only `contents` input is supported. `input_file` is **not** currently handled due to path complexities between container and host.

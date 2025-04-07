@@ -12,7 +12,7 @@
 
 ## Current Focus
 
-*   Clean up Git history to establish the current state as the new baseline for the `main` branch.
+*   Implement mandatory environment variable `PANDOC_HOST_URL` for host service communication in `src/server.ts` and update `README.md`.
 
 ## Recent Changes
 
@@ -24,6 +24,8 @@
 *   [2025-04-07 14:06:54] Confirmed PDF conversion and file saving works correctly end-to-end.
 *   [2025-04-07 14:07:15] Updated Memory Bank (`progress.md`).
 *   [2025-04-07 15:04:00] [Architect/Code] Decided to treat the TS rewrite as a new Git baseline, replacing the old `main` branch history. Updated `decisionLog.md`.
+*   [2025-04-07 15:08:49] [Code] Completed local Git cleanup (commit, rename branch to `main`). Updated `progress.md`.
+*   [2025-04-07 15:16:00] [Architect] Finalized plan: Use mandatory `PANDOC_HOST_URL` environment variable (no default) for host service URL. Updated `decisionLog.md`.
 
 ## Architectural Notes / Limitations
 

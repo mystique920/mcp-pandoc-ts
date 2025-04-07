@@ -70,3 +70,20 @@ This file records architectural and implementation decisions using a list format
 *   Commit the deletion of old Python files on the current feature branch.
 *   Force-rename the feature branch to `main` locally (`git branch -M main`).
 *   Force-push the new `main` branch to the remote repository (`git push origin main --force`), overwriting the previous `main` history. This requires caution.
+
+## Decision
+
+*   [2025-04-07 15:14:00] Use an environment variable (`PANDOC_HOST_URL`) to configure the Python host service address for cross-platform compatibility.
+
+## Rationale
+
+*   Hardcoding host addresses (`host.docker.internal`, `172.17.0.1`) is unreliable across different Docker setups (Docker Desktop vs. native Linux Docker).
+*   Environment variables allow the deployment environment (e.g., Docker Compose, Kubernetes, script) to provide the correct host address from the container's perspective.
+*   This makes the application code portable and delegates platform-specific configuration to the deployment layer.
+
+## Implementation Details
+
+*   Modify `src/server.ts` to read `process.env.PANDOC_HOST_URL`.
+*   If the variable is set, use its value.
+*   If the variable is *not* set, the server should log an error and potentially fail to start or handle requests, as the host service URL is required. No default value will be used.
+*   Update `README.md` to document the `PANDOC_HOST_URL` variable, the default behavior, and provide guidance for setting it in different environments (especially Linux).

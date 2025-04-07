@@ -25,12 +25,15 @@ This file tracks the project's progress using a task list format.
 *   [2025-04-07 14:06:54] [User Feedback] Confirmed PDF conversion and file saving works correctly.
 *   [2025-04-07 14:07:02] [Code] Updated Memory Bank (`decisionLog.md`, `progress.md`, `activeContext.md`, `systemPatterns.md`, `productContext.md`).
 *   [2025-04-07 15:04:00] [Architect/Code] Decided on Git strategy: Treat TS rewrite as new baseline, replace `main` history. Updated `decisionLog.md`, `activeContext.md`.
+*   [2025-04-07 15:16:00] [Architect] Finalized plan: Use mandatory `PANDOC_HOST_URL` env var (no default) for host service URL. Updated `decisionLog.md`, `activeContext.md`.
 
 
 ## Current Tasks
 
-*   [Code] Execute Git cleanup: Commit deletions, rename current branch to `main`, force-push `main`.
+*   [Code] Completed local Git cleanup: Committed deletions/additions, renamed current branch to `main`. (Push skipped as no remote exists).
+*   [Code] Implement mandatory `PANDOC_HOST_URL` environment variable in `src/server.ts` and update `README.md`.
 
 ## Next Steps
 
-*   Confirm successful Git cleanup and push.
+*   Confirm successful code modification and documentation update.
+*   (Optional) User to create remote repository and push the `main` branch.
